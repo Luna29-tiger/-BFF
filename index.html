@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🗺️ 베프리 - 베리어 프리 지도</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/NeoDunggeunmo.css">
+
+  <style>
+    :root {
+      --bg-green: #1B4D3E;
+      --card-bg: #E8F5E9;
+      --accent-yellow: #FFD54F;
+      --point-coral: #FF7043;
+      --text-dark: #1A3026;
+      --pixel-border: 4px solid #000;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'NeoDunggeunmo', sans-serif; }
+    body { background-color: var(--bg-green); color: var(--text-dark); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    /* 🎮 스타트 화면 UI */
+    #startScreen {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--bg-green); z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+    }
+    
+    .start-logo-card {
+      width: 220px; height: 220px;
+      border-radius: 20px; border: var(--pixel-border);
+      background-color: var(--card-bg);
+      box-shadow: 0 8px 0 #000; margin-bottom: 24px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    }
+
+    .menu-btn-group { display: flex; flex-direction: column; gap: 10px; width: 80%; max-width: 280px; }
+    .btn-main { padding: 12px; background: var(--card-bg); color: #000; border: var(--pixel-border); font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #000; }
+    .btn-main.primary { background: var(--point-coral); color: #fff; }
+    .btn-main:active { transform: translateY(4px); box-shadow: 0 0 0 #000; }
+
+    /* 헤더 & 검색 UI */
+    header { background: var(--bg-green); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: var(--pixel-border); color: #fff; }
+    .logo-title { font-size: 20px; color: var(--accent-yellow); text-shadow: 2px 2px #000; }
+
+    .search-bar { background: var(--card-bg); padding: 8px 12px; display: flex; gap: 6px; border-bottom: var(--pixel-border); }
+    .search-input { flex: 1; padding: 8px; border: 3px solid #000; border-radius: 4px; font-size: 13px; }
+    .btn-search { padding: 8px 12px; background: var(--point-coral); color: #fff; border: 3px solid #000; font-weight: bold; cursor: pointer; }
+
+    #map { width: 100%; flex: 1; border-bottom: var(--pixel-border); transition: all 0.3s ease; }
+
+    /* 🔻 접기/펼치기 패널 스타일 */
+    .collapsible-panel {
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .collapsible-panel.collapsed .bottom-container {
+      display: none;
+    }
+
+    /* 🔽 접기 토글 버튼 UI */
+    .toggle-bar {
+      background: #113328;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-top: var(--pixel-border);
+    }
+    .toggle-btn {
+      background: var(--accent-yellow);
+      color: #000;
+      border: 2px solid #000;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      padding: 2px 16px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: -12px;
+      z-index: 1000;
+    }
+
+    /* 메인 탭 메뉴 */
+    .tab-menu { display: flex; background: #113328; border-top: 2px solid #000; }
+    .tab-btn { flex: 1; padding: 10px 4px; background: #2D6A4F; color: #fff; border: none; font-size: 12px; cursor: pointer; border-right: 2px solid #000; text-align: center; }
+    .tab-btn.active { background: var(--card-bg); color: #000; font-weight: bold; }
+
+    .bottom-container { background: var(--card-bg); padding: 12px 14px; max-height: 42vh; overflow-y: auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .input-box { width: 100%; padding: 8px; border: 3px solid #000; background: #fff; font-size: 13px; margin-bottom: 8px; border-radius: 4px; }
+    .checkbox-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .pixel-checkbox { background: #fff; border: 2px solid #000; padding: 6px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .custom-tag-group { display: flex; gap: 6px; margin-bottom: 10px; }
+    .btn-add-tag { background: var(--bg-green); color: #fff; border: 2px solid #000; padding: 0 10px; font-size: 12px; cursor: pointer; border-radius: 4px; }
+
+    .btn-submit { width: 100%; padding: 10px; background: var(--accent-yellow); color: #000; border: var(--pixel-border); font-size: 15px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #000; margin-top: 4px; }
+
+    /* 장소 리스트 UI */
+    .place-item { background: #fff; border: 2px solid #000; border-radius: 6px; padding: 10px; margin-bottom: 8px; display: flex; gap: 10px; align-items: center; }
+    .place-thumb { width: 45px; height: 45px; border: 2px solid #000; object-fit: cover; border-radius: 4px; background: #eee; flex-shrink: 0; }
+    .place-info { flex: 1; cursor: pointer; }
+    .btn-action { color: #fff; border: 2px solid #000; padding: 4px 6px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: bold; margin-left: 2px; }
+    .btn-edit { background: #4A90E2; }
+    .btn-delete { background: #ff4d4d; }
+    .tag { display: inline-block; background: #E0F2FE; border: 1px solid #000; padding: 1px 4px; border-radius: 3px; font-size: 10px; margin-right: 3px; }
+    .star-rating { color: #FFB300; font-size: 12px; font-weight: bold; }
+    
+    /* 🔍 돋보기 버튼 스타일 */
+    .btn-search-detail {
+      display: inline-flex; align-items: center; gap: 3px; margin-top: 4px;
+      padding: 3px 6px; background: #E8F5E9; border: 2px solid #1B4D3E;
+      border-radius: 4px; font-size: 11px; font-weight: bold; color: #1B4D3E;
+    }
+
+    /* 💬 커뮤니티 서브 탭 UI */
+    .comm-sub-tab { display: flex; gap: 6px; margin-bottom: 10px; }
+    .comm-tab-btn { flex: 1; padding: 6px; background: #C8E6C9; border: 2px solid #000; font-size: 12px; cursor: pointer; border-radius: 4px; font-weight: bold; text-align: center; }
+    .comm-tab-btn.active { background: var(--accent-yellow); color: #000; }
+
+    /* 카테고리 관리 버튼 스타일 */
+    .cat-btn-group { display: flex; gap: 3px; }
+    .cat-btn { padding: 4px 6px; font-size: 10px; border: 2px solid #000; border-radius: 4px; cursor: pointer; font-weight: bold; color: #fff; }
+    .cat-btn-add { background: var(--bg-green); }
+    .cat-btn-edit { background: #4A90E2; }
+    .cat-btn-del { background: #ff4d4d; }
+
+    /* 게시글 카드 스타일 */
+    .post-card { background: #fff; border: 2px solid #000; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+    .post-card.notice { background: #FFF9C4; border: 3px solid #000; }
+    .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px dashed #ccc; padding-bottom: 4px; }
+    .badge-notice { background: var(--point-coral); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; border: 1px solid #000; }
+    .badge-free { background: #81C784; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; border: 1px solid #000; }
+    .badge-custom { background: #E0F2FE; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; border: 1px solid #000; }
+    .post-img { width: 100%; max-height: 180px; object-fit: cover; border: 2px solid #000; border-radius: 4px; margin: 6px 0; }
+    .post-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: #666; }
+    
+    .btn-like { background: #E1F5FE; border: 2px solid #000; padding: 2px 8px; border-radius: 12px; font-size: 11px; cursor: pointer; font-weight: bold; color: #0277BD; }
+    .btn-like:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+
+  <!-- 🎮 스타트 화면 -->
+  <div id="startScreen">
+    <div class="start-logo-card">
+      <span style="font-size: 70px;">🗺️</span>
+      <h1 style="font-size: 26px; color: var(--text-dark);">베프리</h1>
+      <p style="font-size: 12px; color: #555;">베리어 프리 지도</p>
+    </div>
+    
+    <div class="menu-btn-group">
+      <button class="btn-main primary" onclick="enterApp('registerTab')">▶ PRESS START</button>
+      <button class="btn-main" onclick="enterApp('registerTab')">📍 장소 등록하기</button>
+      <button class="btn-main" onclick="enterApp('listTab')">📋 등록 장소 목록</button>
+      <button class="btn-main" onclick="enterApp('communityTab')">💬 커뮤니티 / 공지</button>
+    </div>
+  </div>
+
+  <!-- 메인 헤더 -->
+  <header>
+    <div onclick="goHome()" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+      <span style="font-size: 22px;">🗺️</span>
+      <h1 class="logo-title">베프리</h1>
+    </div>
+  </header>
+
+  <div class="search-bar">
+    <input type="text" id="searchInput" class="search-input" placeholder="장소 검색 (예: 계산여고)" onkeyup="if(window.event.keyCode==13){searchLocation()}">
+    <button class="btn-search" onclick="searchLocation()">검색</button>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- 🔻 접기/펼치기 하단 패널 감싸기 -->
+  <div id="collapsiblePanel" class="collapsible-panel">
+    <!-- 화살표 접기/펼치기 토글 버튼 -->
+    <div class="toggle-bar">
+      <button id="toggleBtn" class="toggle-btn" onclick="toggleBottomPanel()">▼ 접기</button>
+    </div>
+
+    <!-- 메인 하단 탭 메뉴 -->
+    <div class="tab-menu">
+      <button id="btnTabRegister" class="tab-btn active" onclick="switchTab('registerTab', this)">📍 장소 등록</button>
+      <button id="btnTabList" class="tab-btn" onclick="switchTab('listTab', this)">📋 장소 목록</button>
+      <button id="btnTabCommunity" class="tab-btn" onclick="switchTab('communityTab', this)">💬 커뮤니티</button>
+    </div>
+
+    <div class="bottom-container">
+      <!-- 1. 장소 등록 탭 -->
+      <div id="registerTab" class="tab-content active">
+        <div style="display:flex; gap:6px; margin-bottom:6px;">
+          <input type="text" id="placeAuthor" class="input-box" placeholder="닉네임" style="margin-bottom:0;">
+          <input type="password" id="placePw" class="input-box" placeholder="비밀번호" style="margin-bottom:0;">
+        </div>
+
+        <input type="text" id="location" class="input-box" readonly placeholder="지도를 클릭해 위치를 선택하세요.">
+
+        <!-- 📝 장소 설명 입력 필드 -->
+        <textarea id="placeDescription" class="input-box" style="height:50px; resize:none;" placeholder="장소에 대한 상세 설명을 입력하세요..."></textarea>
+
+        <!-- ⭐ 별점 선택 -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <label style="font-size:12px; font-weight:bold;">⭐ 베리어 프리 점수:</label>
+          <select id="placeRating" class="input-box" style="width:auto; margin-bottom:0; padding:4px;">
+            <option value="5" selected>⭐⭐⭐⭐⭐ (5점 - 매우 우수)</option>
+            <option value="4">⭐⭐⭐⭐☆ (4점 - 우수)</option>
+            <option value="3">⭐⭐⭐☆☆ (3점 - 보통)</option>
+            <option value="2">⭐⭐☆☆☆ (2점 - 미흡)</option>
+            <option value="1">⭐☆☆☆☆ (1점 - 매우 미흡)</option>
+          </select>
+        </div>
+
+        <div class="checkbox-group" id="checkboxGroup">
+          <label class="pixel-checkbox"><input type="checkbox" value="♿ 경사로"> ♿ 경사로</label>
+          <label class="pixel-checkbox"><input type="checkbox" value="🛗 엘리베이터"> 🛗 엘리베이터</label>
+          <label class="pixel-checkbox"><input type="checkbox" value="⠃ 점자블록"> ⠃ 점자블록</label>
+        </div>
+
+        <div class="custom-tag-group">
+          <input type="text" id="customTagInput" class="input-box" placeholder="추가 조건 입력" style="margin-bottom:0;">
+          <button class="btn-add-tag" onclick="addCustomCondition()">+ 추가</button>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label style="font-size:11px;">📷 현장 사진 첨부:</label>
+          <input type="file" id="imageInput" accept="image/*" onchange="previewImage(this)" style="font-size:11px;">
+        </div>
+
+        <button class="btn-submit" onclick="submitReport()">★ 장소 등록하기 ★</button>
+      </div>
+
+      <!-- 2. 장소 목록 탭 -->
+      <div id="listTab" class="tab-content">
+        <ul id="placeList"></ul>
+      </div>
+
+      <!-- 3. 커뮤니티 탭 -->
+      <div id="communityTab" class="tab-content">
+        <div class="comm-sub-tab">
+          <button id="btnCommList" class="comm-tab-btn active" onclick="switchCommSubTab('list')">📋 게시글 목록</button>
+          <button id="btnCommWrite" class="comm-tab-btn" onclick="switchCommSubTab('write')">✍️ 글쓰기</button>
+        </div>
+
+        <div id="commListSubTab">
+          <div id="communityList"></div>
+        </div>
+
+        <div id="commWriteSubTab" style="display: none;">
+          <div style="background:#fff; border:2px solid #000; border-radius:6px; padding:10px;">
+            
+            <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
+              <select id="postCategory" class="input-box" style="width:110px; margin-bottom:0;">
+                <option value="자유">💬 자유</option>
+                <option value="공지">📢 공지</option>
+              </select>
+
+              <div class="cat-btn-group">
+                <button type="button" class="cat-btn cat-btn-add" onclick="addCategoryByAdmin()">+ 추가</button>
+                <button type="button" class="cat-btn cat-btn-edit" onclick="editCategoryByAdmin()">✏️ 수정</button>
+                <button type="button" class="cat-btn cat-btn-del" onclick="deleteCategoryByAdmin()">🗑️ 삭제</button>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:6px; margin-bottom:6px;">
+              <input type="text" id="postAuthor" class="input-box" placeholder="닉네임" style="margin-bottom:0;">
+              <input type="password" id="postPw" class="input-box" placeholder="비밀번호" style="margin-bottom:0;">
+            </div>
+            <input type="text" id="postTitle" class="input-box" placeholder="글 제목">
+            <textarea id="postContent" class="input-box" style="height:70px; resize:none;" placeholder="내용을 작성하세요..."></textarea>
+            
+            <div style="margin-bottom:8px;">
+              <label style="font-size:11px;">📷 이미지 첨부:</label>
+              <input type="file" id="postImageInput" accept="image/*" onchange="previewPostImage(this)" style="font-size:11px;">
+            </div>
+
+            <button class="btn-submit" onclick="submitPost()">게시글 등록하기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ADMIN_PW = "0824"; // 마스터 관리자 비밀번호
+
+    const map = L.map('map', { zoomControl: false }).setView([37.5665, 126.9780], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    let currentTab = 'registerTab';
+    let selectedMarker = null;
+    let selectedLat = null;
+    let selectedLng = null;
+    let selectedTitle = "";
+    let currentBase64Image = "";
+    let currentPostBase64Image = "";
+
+    let savedPlaces = JSON.parse(localStorage.getItem('befree_places')) || [];
+    let savedPosts = JSON.parse(localStorage.getItem('befree_posts')) || [];
+    let customCategories = JSON.parse(localStorage.getItem('befree_categories')) || [];
+    let mapMarkers = [];
+
+    window.onload = function() {
+      loadCategories();
+      renderSavedPlaces();
+      renderPosts();
+    };
+
+    /* 🔻 패널 접기/펼치기 함수 */
+    function toggleBottomPanel() {
+      const panel = document.getElementById('collapsiblePanel');
+      const btn = document.getElementById('toggleBtn');
+
+      panel.classList.toggle('collapsed');
+
+      if (panel.classList.contains('collapsed')) {
+        btn.innerHTML = '▲ 펼치기';
+      } else {
+        btn.innerHTML = '▼ 접기';
+      }
+
+      // 지도가 깨지지 않도록 리사이즈
+      setTimeout(() => { map.invalidateSize(); }, 300);
+    }
+
+    function enterApp(targetTab) {
+      document.getElementById('startScreen').style.display = 'none';
+      const btnMap = {
+        'registerTab': document.getElementById('btnTabRegister'),
+        'listTab': document.getElementById('btnTabList'),
+        'communityTab': document.getElementById('btnTabCommunity')
+      };
+      switchTab(targetTab, btnMap[targetTab]);
+    }
+
+    function goHome() { 
+      document.getElementById('startScreen').style.display = 'flex'; 
+    }
+
+    function switchTab(tabId, btnElement) {
+      currentTab = tabId;
+
+      // 만약 접혀있었다면 탭을 지눌렀을 때 자동으로 펼쳐지도록 처리
+      const panel = document.getElementById('collapsiblePanel');
+      if (panel.classList.contains('collapsed')) {
+        toggleBottomPanel();
+      }
+
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      if (btnElement) btnElement.classList.add('active');
+
+      if (currentTab !== 'registerTab' && selectedMarker) {
+        map.removeLayer(selectedMarker);
+        selectedMarker = null;
+      }
+    }
+
+    function getStarString(rating) {
+      const num = parseInt(rating) || 5;
+      return "★".repeat(num) + "☆".repeat(5 - num);
+    }
+
+    /* --- 지도 및 장소 관련 기능 --- */
+    map.on('click', function(e) {
+      if (currentTab !== 'registerTab') return;
+
+      selectedLat = e.latlng.lat;
+      selectedLng = e.latlng.lng;
+      selectedTitle = `선택 위치 (${selectedLat.toFixed(4)}, ${selectedLng.toFixed(4)})`;
+
+      if (selectedMarker) map.removeLayer(selectedMarker);
+      selectedMarker = L.marker([selectedLat, selectedLng]).addTo(map);
+      document.getElementById('location').value = selectedTitle;
+    });
+
+    function searchLocation() {
+      const query = document.getElementById('searchInput').value;
+      if (!query) return;
+
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            map.setView([lat, lon], 16);
+
+            if (currentTab === 'registerTab') {
+              selectedLat = lat; selectedLng = lon;
+              selectedTitle = `${data[0].display_name.split(',')[0]} (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+              
+              if (selectedMarker) map.removeLayer(selectedMarker);
+              selectedMarker = L.marker([lat, lon]).addTo(map);
+              document.getElementById('location').value = selectedTitle;
+            }
+          }
+        });
+    }
+
+    function addCustomCondition() {
+      const input = document.getElementById('customTagInput');
+      if(!input.value.trim()) return;
+      const group = document.getElementById('checkboxGroup');
+      const label = document.createElement('label');
+      label.className = 'pixel-checkbox';
+      label.innerHTML = `<input type="checkbox" value="✨ ${input.value}" checked> ✨ ${input.value}`;
+      group.appendChild(label);
+      input.value = "";
+    }
+
+    function previewImage(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) { currentBase64Image = e.target.result; }
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function submitReport() {
+      const author = document.getElementById('placeAuthor').value.trim();
+      const pw = document.getElementById('placePw').value.trim();
+
+      if (!author || !pw) {
+        alert("닉네임과 비밀번호를 모두 입력해주세요!");
+        return;
+      }
+
+      if (!selectedLat) { alert("위치를 지도로 선택해주세요!"); return; }
+
+      const features = [];
+      document.querySelectorAll('#checkboxGroup input[type="checkbox"]:checked').forEach(cb => features.push(cb.value));
+      const rating = document.getElementById('placeRating').value;
+      const description = document.getElementById('placeDescription').value.trim();
+
+      const newPlace = {
+        id: Date.now(),
+        author: author,
+        password: pw,
+        lat: selectedLat,
+        lng: selectedLng,
+        title: selectedTitle,
+        description: description,
+        features: features,
+        rating: rating,
+        image: currentBase64Image
+      };
+
+      savedPlaces.push(newPlace);
+      localStorage.setItem('befree_places', JSON.stringify(savedPlaces));
+
+      if (selectedMarker) { map.removeLayer(selectedMarker); selectedMarker = null; }
+      document.getElementById('placeAuthor').value = "";
+      document.getElementById('placePw').value = "";
+      document.getElementById('location').value = "";
+      document.getElementById('placeDescription').value = "";
+      currentBase64Image = "";
+      document.getElementById('imageInput').value = "";
+
+      renderSavedPlaces();
+      alert("🎉 장소가 성공적으로 등록되었습니다!");
+      switchTab('listTab', document.getElementById('btnTabList'));
+    }
+
+    function focusPlaceOnMap(index) {
+      const place = savedPlaces[index];
+      if (place) {
+        map.setView([place.lat, place.lng], 18);
+        if (mapMarkers[index]) {
+          mapMarkers[index].openPopup();
+        }
+      }
+    }
+
+    function editPlace(id) {
+      const place = savedPlaces.find(p => p.id === id);
+      if (!place) return;
+
+      const inputPw = prompt("등록 시 설정한 비밀번호 또는 관리자 비밀번호를 입력하세요:");
+      if (inputPw === null) return;
+
+      if (inputPw === place.password || inputPw === ADMIN_PW) {
+        const newTitle = prompt("수정할 장소명을 입력하세요:", place.title);
+        if (newTitle === null) return;
+
+        const newDesc = prompt("수정할 장소 설명을 입력하세요:", place.description || "");
+        if (newDesc === null) return;
+
+        const newRating = prompt("수정할 별점(1~5 숫자 입력):", place.rating || 5);
+        if (newRating === null) return;
+
+        const currentFeaturesStr = place.features.join(', ');
+        const newFeaturesStr = prompt("수정할 편의시설 정보(쉼표로 구분):", currentFeaturesStr);
+        if (newFeaturesStr === null) return;
+
+        place.title = newTitle.trim() || place.title;
+        place.description = newDesc.trim();
+        place.rating = Math.max(1, Math.min(5, parseInt(newRating) || 5));
+        place.features = newFeaturesStr.split(',').map(f => f.trim()).filter(f => f.length > 0);
+
+        localStorage.setItem('befree_places', JSON.stringify(savedPlaces));
+        renderSavedPlaces();
+        alert("✏️ 장소 정보가 수정되었습니다.");
+      } else {
+        alert("❌ 비밀번호가 일치하지 않습니다!");
+      }
+    }
+
+    function deletePlace(id) {
+      const place = savedPlaces.find(p => p.id === id);
+      if (!place) return;
+
+      const inputPw = prompt("등록 시 설정한 비밀번호 또는 관리자 비밀번호를 입력하세요:");
+      if (inputPw === null) return;
+
+      if (inputPw === place.password || inputPw === ADMIN_PW) {
+        if (confirm("이 장소를 목록에서 삭제하시겠습니까?")) {
+          savedPlaces = savedPlaces.filter(p => p.id !== id);
+          localStorage.setItem('befree_places', JSON.stringify(savedPlaces));
+          renderSavedPlaces();
+          alert("🗑️ 장소가 삭제되었습니다.");
+        }
+      } else {
+        alert("❌ 비밀번호가 일치하지 않습니다!");
+      }
+    }
+
+    function renderSavedPlaces() {
+      mapMarkers.forEach(m => map.removeLayer(m));
+      mapMarkers = [];
+
+      const listEl = document.getElementById('placeList');
+      listEl.innerHTML = "";
+
+      if(savedPlaces.length === 0) {
+        listEl.innerHTML = '<li style="font-size:12px; color:#666; text-align:center; padding:15px;">등록된 장소가 없습니다.</li>';
+        return;
+      }
+
+      savedPlaces.forEach((place, index) => {
+        const stars = getStarString(place.rating);
+        const marker = L.marker([place.lat, place.lng]).addTo(map);
+        
+        const authorText = place.author ? `등록자: ${place.author}` : '';
+        let popupContent = `<b>📍 ${place.title}</b><br><span style="color:#FFB300;">${stars}</span><br>${place.description ? '💬 ' + place.description + '<br>' : ''}${place.features.join(', ') || '정보 없음'}`;
+        if (authorText) popupContent += `<br><span style="font-size:11px; color:#666;">✍️ ${authorText}</span>`;
+        if (place.image) popupContent += `<br><img src="${place.image}" style="width:100%; max-height:80px; margin-top:4px; border-radius:4px;">`;
+        
+        marker.bindPopup(popupContent);
+        mapMarkers.push(marker);
+
+        const li = document.createElement('li');
+        li.className = 'place-item';
+        
+        const tagsHtml = place.features.map(f => `<span class="tag">${f}</span>`).join('');
+        const imgTag = place.image ? `<img src="${place.image}" class="place-thumb">` : `<div class="place-thumb" style="display:flex;align-items:center;justify-content:center;font-size:18px;">📍</div>`;
+        const descHtml = place.description ? `<div style="font-size:11px; color:#555; margin-top:2px;">${place.description}</div>` : '';
+        const authorHtml = place.author ? `<div style="font-size:10px; color:#888; margin-top:2px;">✍️ ${place.author}</div>` : '';
+
+        li.innerHTML = `
+          ${imgTag}
+          <div class="place-info" onclick="focusPlaceOnMap(${index})">
+            <div style="font-size:12px; font-weight:bold; color:#1B4D3E;">${place.title}</div>
+            <div class="star-rating">${stars} (${place.rating || 5}점)</div>
+            ${descHtml}
+            ${authorHtml}
+            <div style="margin-top:2px;">${tagsHtml}</div>
+            <div><span class="btn-search-detail">🔍 지도에서 보기</span></div>
+          </div>
+          <div>
+            <button class="btn-action btn-edit" onclick="editPlace(${place.id})">수정</button>
+            <button class="btn-action btn-delete" onclick="deletePlace(${place.id})">삭제</button>
+          </div>
+        `;
+
+        listEl.appendChild(li);
+      });
+    }
+
+    /* --- 💬 커뮤니티 카테고리 관리 및 권한 검증 --- */
+    function loadCategories() {
+      const select = document.getElementById('postCategory');
+      select.innerHTML = `
+        <option value="자유">💬 자유</option>
+        <option value="공지">📢 공지</option>
+      `;
+      customCategories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = `📌 ${cat}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function checkAdminAuth() {
+      const inputPw = prompt("관리자 비밀번호를 입력하세요:");
+      if (inputPw === ADMIN_PW) {
+        return true;
+      } else if (inputPw !== null) {
+        alert("❌ 관리자 비밀번호가 일치하지 않습니다!");
+      }
+      return false;
+    }
+
+    function addCategoryByAdmin() {
+      if (!checkAdminAuth()) return;
+
+      const newCat = prompt("추가할 신규 카테고리 이름을 입력하세요:");
+      if (newCat && newCat.trim()) {
+        const catName = newCat.trim();
+        if (!customCategories.includes(catName) && catName !== "자유" && catName !== "공지") {
+          customCategories.push(catName);
+          localStorage.setItem('befree_categories', JSON.stringify(customCategories));
+          loadCategories();
+          document.getElementById('postCategory').value = catName;
+          alert(`✅ '${catName}' 카테고리가 추가되었습니다!`);
+        } else {
+          alert("이미 존재하는 카테고리명입니다.");
+        }
+      }
+    }
+
+    function editCategoryByAdmin() {
+      const select = document.getElementById('postCategory');
+      const currentVal = select.value;
+
+      if (currentVal === "자유" || currentVal === "공지") {
+        alert("기본 카테고리('자유', '공지')는 수정할 수 없습니다.");
+        return;
+      }
+
+      if (!checkAdminAuth()) return;
+
+      const newCatName = prompt(`'${currentVal}' 카테고리의 새로운 이름을 입력하세요:`, currentVal);
+      if (newCatName && newCatName.trim() && newCatName.trim() !== currentVal) {
+        const trimmed = newCatName.trim();
+        const index = customCategories.indexOf(currentVal);
+        if (index !== -1) {
+          customCategories[index] = trimmed;
+          localStorage.setItem('befree_categories', JSON.stringify(customCategories));
+
+          savedPosts.forEach(p => { if (p.category === currentVal) p.category = trimmed; });
+          localStorage.setItem('befree_posts', JSON.stringify(savedPosts));
+
+          loadCategories();
+          renderPosts();
+          document.getElementById('postCategory').value = trimmed;
+          alert(`✏️ '${currentVal}' 카테고리가 '${trimmed}'(으)로 수정되었습니다.`);
+        }
+      }
+    }
+
+    function deleteCategoryByAdmin() {
+      const select = document.getElementById('postCategory');
+      const currentVal = select.value;
+
+      if (currentVal === "자유" || currentVal === "공지") {
+        alert("기본 카테고리('자유', '공지')는 삭제할 수 없습니다.");
+        return;
+      }
+
+      if (!checkAdminAuth()) return;
+
+      if (confirm(`정말로 '${currentVal}' 카테고리를 삭제하시겠습니까?`)) {
+        customCategories = customCategories.filter(c => c !== currentVal);
+        localStorage.setItem('befree_categories', JSON.stringify(customCategories));
+
+        loadCategories();
+        document.getElementById('postCategory').value = "자유";
+        alert(`🗑️ '${currentVal}' 카테고리가 삭제되었습니다.`);
+      }
+    }
+
+    function switchCommSubTab(subTab) {
+      const btnList = document.getElementById('btnCommList');
+      const btnWrite = document.getElementById('btnCommWrite');
+      const listSub = document.getElementById('commListSubTab');
+      const writeSub = document.getElementById('commWriteSubTab');
+
+      if (subTab === 'list') {
+        btnList.classList.add('active');
+        btnWrite.classList.remove('active');
+        listSub.style.display = 'block';
+        writeSub.style.display = 'none';
+      } else {
+        btnWrite.classList.add('active');
+        btnList.classList.remove('active');
+        writeSub.style.display = 'block';
+        listSub.style.display = 'none';
+      }
+    }
+
+    function previewPostImage(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) { currentPostBase64Image = e.target.result; }
+        reader.readAsDataURL(input.files[0]);
+      } else {
+        currentPostBase64Image = "";
+      }
+    }
+
+    function submitPost() {
+      const category = document.getElementById('postCategory').value;
+      const author = document.getElementById('postAuthor').value.trim();
+      const pw = document.getElementById('postPw').value.trim();
+      const title = document.getElementById('postTitle').value.trim();
+      const content = document.getElementById('postContent').value.trim();
+
+      if (!author || !pw || !title || !content) {
+        alert("닉네임, 비밀번호, 제목, 내용을 모두 입력해 주세요!");
+        return;
+      }
+
+      if (category === "공지") {
+        if (!checkAdminAuth()) return;
+      }
+
+      const now = new Date();
+      const timeStr = `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      const newPost = {
+        id: Date.now(),
+        category: category,
+        author: author,
+        password: pw,
+        title: title,
+        content: content,
+        image: currentPostBase64Image,
+        likes: 0,
+        date: timeStr
+      };
+
+      savedPosts.unshift(newPost);
+      localStorage.setItem('befree_posts', JSON.stringify(savedPosts));
+
+      document.getElementById('postAuthor').value = "";
+      document.getElementById('postPw').value = "";
+      document.getElementById('postTitle').value = "";
+      document.getElementById('postContent').value = "";
+      document.getElementById('postImageInput').value = "";
+      currentPostBase64Image = "";
+
+      renderPosts();
+      alert("📝 게시글이 작성되었습니다!");
+      switchCommSubTab('list');
+    }
+
+    function likePost(id) {
+      const targetPost = savedPosts.find(p => p.id === id);
+      if (targetPost) {
+        targetPost.likes = (targetPost.likes || 0) + 1;
+        localStorage.setItem('befree_posts', JSON.stringify(savedPosts));
+        renderPosts();
+      }
+    }
+
+    function editPost(id) {
+      const targetPost = savedPosts.find(p => p.id === id);
+      if (!targetPost) return;
+
+      const inputPw = prompt("비밀번호 또는 관리자 비밀번호를 입력해 주세요:");
+      if (inputPw === null) return;
+
+      if (inputPw === targetPost.password || inputPw === ADMIN_PW) {
+        const newTitle = prompt("수정할 제목:", targetPost.title);
+        if (newTitle === null) return;
+        
+        const newContent = prompt("수정할 내용:", targetPost.content);
+        if (newContent === null) return;
+
+        targetPost.title = newTitle.trim() || targetPost.title;
+        targetPost.content = newContent.trim() || targetPost.content;
+
+        localStorage.setItem('befree_posts', JSON.stringify(savedPosts));
+        renderPosts();
+        alert("✏️ 게시글이 수정되었습니다!");
+      } else {
+        alert("❌ 비밀번호가 일치하지 않습니다!");
+      }
+    }
+
+    function deletePost(id) {
+      const targetPost = savedPosts.find(p => p.id === id);
+      if (!targetPost) return;
+
+      const inputPw = prompt("비밀번호 또는 관리자 비밀번호를 입력해 주세요:");
+      if (inputPw === null) return;
+
+      if (inputPw === targetPost.password || inputPw === ADMIN_PW) {
+        savedPosts = savedPosts.filter(p => p.id !== id);
+        localStorage.setItem('befree_posts', JSON.stringify(savedPosts));
+        renderPosts();
+        alert("🗑️ 게시글이 삭제되었습니다.");
+      } else {
+        alert("❌ 비밀번호가 일치하지 않습니다!");
+      }
+    }
+
+    function renderPosts() {
+      const container = document.getElementById('communityList');
+      container.innerHTML = "";
+
+      if (savedPosts.length === 0) {
+        container.innerHTML = '<div style="font-size:12px; color:#666; text-align:center; padding:15px;">등록된 게시물이 없습니다. [✍️ 글쓰기] 탭에서 첫 글을 작성해보세요!</div>';
+        return;
+      }
+
+      savedPosts.forEach(post => {
+        const isNotice = post.category === '공지';
+        const isFree = post.category === '자유';
+        const card = document.createElement('div');
+        card.className = `post-card ${isNotice ? 'notice' : ''}`;
+
+        let badgeClass = 'badge-custom';
+        if (isNotice) badgeClass = 'badge-notice';
+        else if (isFree) badgeClass = 'badge-free';
+
+        const imgHtml = post.image ? `<img src="${post.image}" class="post-img" alt="첨부 이미지">` : '';
+
+        card.innerHTML = `
+          <div class="post-header">
+            <div>
+              <span class="${badgeClass}">${post.category}</span>
+              <strong style="font-size:13px; margin-left:4px;">${post.title}</strong>
+            </div>
+            <div>
+              <button class="btn-action btn-edit" onclick="editPost(${post.id})">수정</button>
+              <button class="btn-action btn-delete" onclick="deletePost(${post.id})">삭제</button>
+            </div>
+          </div>
+          ${imgHtml}
+          <div style="font-size:12px; color:#222; margin-bottom:6px; white-space:pre-wrap;">${post.content}</div>
+          <div class="post-footer">
+            <div>
+              <span>✍️ ${post.author}</span>
+              <span style="margin-left:6px;">🕒 ${post.date}</span>
+            </div>
+            <button class="btn-like" onclick="likePost(${post.id})">👍 ${post.likes || 0}</button>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+  </script>
+</body>
+</html>
